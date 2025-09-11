@@ -64,7 +64,7 @@ export default function Hero() {
               </h3>
 
               <div className="space-y-4">
-                {/* Grid Operations Demo */}
+                {/* Grid Operators Demo */}
                 <Link 
                   href="/demo"
                   className="group block p-6 bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-xl hover:border-emerald-400/40 transition-all duration-300 hover:scale-[1.02]"
@@ -77,7 +77,7 @@ export default function Hero() {
                     </div>
                     <div>
                       <h4 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors">
-                        Grid Operations Demo
+                        Grid Operators Demo
                       </h4>
                       <p className="text-sm text-gray-400">For utility operators and engineers</p>
                     </div>
