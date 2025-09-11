@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function CTA() {
   return (
     <section id="demo" className="py-24 px-6">
@@ -15,10 +17,10 @@ export default function CTA() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-6">
-              <a href="/demo" className="group relative px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl font-bold text-lg text-gray-900 hover:shadow-2xl hover:shadow-emerald-500/30 transition-all duration-300 hover:scale-105 inline-block">
+              <Link href="/demo" className="group relative px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl font-bold text-lg text-gray-900 hover:shadow-2xl hover:shadow-emerald-500/30 transition-all duration-300 hover:scale-105 inline-block">
                 <span className="relative z-10">Launch Demo</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </a>
+              </Link>
               
               <a href="#technology" className="px-8 py-4 border-2 border-white/20 rounded-2xl font-bold text-lg hover:bg-white/5 hover:border-emerald-400/50 transition-all duration-300">
                 View Technology

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -36,10 +37,10 @@ export default function Navbar() {
             <a href="#demo" className="text-gray-300 hover:text-emerald-400 transition-colors">Demo</a>
           </div>
           
-          <a href="/demo" className="relative group px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl font-semibold text-gray-900 hover:shadow-2xl hover:shadow-emerald-500/25 transition-all duration-300 hover:scale-105 inline-block">
+          <Link href="/demo" className="relative group px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl font-semibold text-gray-900 hover:shadow-2xl hover:shadow-emerald-500/25 transition-all duration-300 hover:scale-105 inline-block">
             <span className="relative z-10">Try Demo</span>
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-          </a>
+          </Link>
         </div>
       </div>
     </nav>

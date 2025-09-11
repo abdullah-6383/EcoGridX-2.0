@@ -767,12 +767,16 @@ function Dashboard() {
     <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">
-          <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-            EcoGridX Dashboard
-          </span>
-        </h1>
-        <p className="text-gray-400">Comprehensive overview of smart grid operations and performance</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">
+              <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                EcoGridX Dashboard
+              </span>
+            </h1>
+            <p className="text-gray-400">Comprehensive overview of smart grid operations and performance</p>
+          </div>
+        </div>
       </div>
 
       {/* Interactive Energy Flow Network - Obsidian Graph Style */}
