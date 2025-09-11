@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-gray-800;
+  }
+  body {
+    @apply bg-gray-950 text-white;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-950;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gradient-to-b from-emerald-500 to-cyan-500 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply from-emerald-400 to-cyan-400;
+}
+
+/* Smooth transitions - more specific to avoid scroll issues */
+a, button, .transition {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Background patterns */
+.grid-pattern {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+.mesh-gradient {
+  background: 
+    radial-gradient(at 40% 20%, hsla(28,100%,74%,1) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(189,100%,56%,1) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, hsla(355,100%,93%,1) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, hsla(340,100%,76%,1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(22,100%,77%,1) 0px, transparent 50%),
+    radial-gradient(at 80% 100%, hsla(242,100%,70%,1) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, hsla(343,100%,76%,1) 0px, transparent 50%);
+}
+
+/* Lovable-inspired gradients */
+.lovable-gradient {
+  background: linear-gradient(
+    135deg,
+    #667eea 0%,
+    #764ba2 100%
+  );
+}
+
+.hero-gradient {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.1) 0%,
+    rgba(59, 130, 246, 0.1) 35%,
+    rgba(147, 51, 234, 0.1) 100%
+  );
+}
+
+/* Animated background */
+.animated-bg {
+  background: linear-gradient(
+    -45deg,
+    #0f172a,
+    #1e293b,
+    #334155,
+    #475569
+  );
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
