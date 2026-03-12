@@ -178,6 +178,61 @@ export default function PredictionHistory() {
     }
   };
 
+  const getFilteredData = () => {
+    return predictionData.filter((p) => {
+      if (selectedMetric !== 'all') {
+        const metricMap: Record<string, string> = {
+          'energy-demand': 'Energy Demand',
+          'solar-generation': 'Solar Generation',
+          'wind-generation': 'Wind Generation',
+          'storage-charge': 'Storage Charge',
+          'peak-load': 'Peak Load',
+        };
+        if (metricMap[selectedMetric] && p.type !== metricMap[selectedMetric]) return false;
+      }
+      if (selectedPeriod !== '7d') {
+        const ts = new Date(p.timestamp).getTime();
+        if (!isNaN(ts)) {
+          const now = Date.now();
+          const hours: Record<string, number> = { '1h': 1, '24h': 24, '7d': 168, '30d': 720 };
+          const cutoff = now - (hours[selectedPeriod] || 168) * 3600000;
+          if (ts < cutoff) return false;
+        }
+      }
+      return true;
+    });
+  };
+
+  const handleExport = () => {
+    const filtered = getFilteredData();
+    if (filtered.length === 0) {
+      alert('No data to export for the selected filters.');
+      return;
+    }
+    const headers = ['ID', 'Timestamp', 'Type', 'Predicted', 'Actual', 'Accuracy (%)', 'Confidence (%)', 'Status', 'Region'];
+    const rows = filtered.map((p) => [
+      p.id,
+      p.timestamp,
+      p.type,
+      p.predicted,
+      p.actual,
+      p.accuracy != null ? p.accuracy.toFixed(1) : '',
+      p.confidence.toString(),
+      p.status,
+      p.region,
+    ]);
+    const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `prediction-history-${selectedPeriod}-${selectedMetric}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 90) return 'bg-green-500';
     if (confidence >= 80) return 'bg-yellow-500';
@@ -227,8 +282,14 @@ export default function PredictionHistory() {
             </select>
           </div>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-          Export Data
+        <button
+          onClick={handleExport}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
         </button>
       </div>
 
@@ -452,30 +513,7 @@ export default function PredictionHistory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-700">
-              {predictionData
-                .filter((p) => {
-                  if (selectedMetric !== 'all') {
-                    const metricMap: Record<string, string> = {
-                      'energy-demand': 'Energy Demand',
-                      'solar-generation': 'Solar Generation',
-                      'wind-generation': 'Wind Generation',
-                      'storage-charge': 'Storage Charge',
-                      'peak-load': 'Peak Load',
-                    };
-                    if (metricMap[selectedMetric] && p.type !== metricMap[selectedMetric]) return false;
-                  }
-                  if (selectedPeriod !== '7d') {
-                    const ts = new Date(p.timestamp).getTime();
-                    if (!isNaN(ts)) {
-                      const now = Date.now();
-                      const hours: Record<string, number> = { '1h': 1, '24h': 24, '7d': 168, '30d': 720 };
-                      const cutoff = now - (hours[selectedPeriod] || 168) * 3600000;
-                      if (ts < cutoff) return false;
-                    }
-                  }
-                  return true;
-                })
-                .map((prediction) => (
+              {getFilteredData().map((prediction) => (
                 <tr key={prediction.id} className="hover:bg-gray-750 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                     {prediction.timestamp}
