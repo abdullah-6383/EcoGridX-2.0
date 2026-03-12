@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import AIOptimizer from '@/components/demo/AIOptimizer';
 import StorageManagement from '@/components/demo/StorageManagement';
 import PredictionHistory from '@/components/demo/PredictionHistory';
+import PredictionModels from '@/components/demo/PredictionModels';
 import { api } from '@/lib/api';
 
 export default function Demo() {
@@ -71,6 +72,11 @@ function DemoSidebar({ activeTab, setActiveTab, isOpen, setIsOpen }: DemoSidebar
       id: 'storage-management',
       name: 'Storage Management',
       icon: <StorageIcon />
+    },
+    {
+      id: 'prediction-models',
+      name: 'Prediction Models',
+      icon: <AIOptimizerIcon />
     },
     {
       id: 'prediction-history',
@@ -207,6 +213,7 @@ function DemoContent({ activeTab, sidebarOpen }: DemoContentProps) {
         {activeTab === 'dashboard' && <Dashboard />}
         {activeTab === 'ai-optimization' && <AIOptimizer />}
         {activeTab === 'storage-management' && <StorageManagement />}
+        {activeTab === 'prediction-models' && <PredictionModels />}
         {activeTab === 'prediction-history' && <PredictionHistory />}
         {activeTab === 'alerts' && <Alerts />}
         {activeTab === 'settings' && <Settings />}
