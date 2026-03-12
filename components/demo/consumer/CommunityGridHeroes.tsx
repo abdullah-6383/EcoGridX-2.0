@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 
 export default function CommunityGridHeroes() {
   const [activeChallenge, setActiveChallenge] = useState(true);
@@ -27,8 +28,7 @@ export default function CommunityGridHeroes() {
     }
   }, [activeChallenge, userParticipating]);
 
-  // Personal badges
-  const badges = [
+  const [badges, setBadges] = useState([
     {
       id: 1,
       name: 'Peak Saver',
@@ -74,10 +74,9 @@ export default function CommunityGridHeroes() {
       progress: 32,
       target: 50
     }
-  ];
+  ]);
 
-  // Neighborhood leaderboard
-  const leaderboard = [
+  const [leaderboard, setLeaderboard] = useState([
     { rank: 1, name: 'Green Valley', participants: 847, score: 2847, badge: '🥇' },
     { rank: 2, name: 'Eco Heights', participants: 623, score: 2634, badge: '🥈' },
     { rank: 3, name: 'Solar Gardens', participants: 756, score: 2489, badge: '🥉' },
@@ -85,12 +84,11 @@ export default function CommunityGridHeroes() {
     { rank: 5, name: 'Energy Plaza', participants: 689, score: 2156, badge: '5️⃣' },
     { rank: 6, name: 'Smart City', participants: 712, score: 2098, badge: '6️⃣' },
     { rank: 7, name: 'Your Neighborhood', participants: 456, score: 1987, badge: '7️⃣', isUser: true }
-  ];
+  ]);
 
-  // Active challenges - Enhanced with more variety
-  const challenges = [
+  const [challenges, setChallenges] = useState([
     {
-      id: 1,
+      id: 'ch-001',
       title: 'Peak Hour Challenge',
       description: 'Reduce community load by 15% during 2-4 PM to prevent power cuts',
       timeLeft: '1h 23m',
@@ -103,7 +101,7 @@ export default function CommunityGridHeroes() {
       type: 'urgent'
     },
     {
-      id: 2,
+      id: 'ch-002',
       title: 'Weekend Energy Saver',
       description: 'Keep weekend consumption below weekday average',
       timeLeft: '2 days',
@@ -116,7 +114,7 @@ export default function CommunityGridHeroes() {
       type: 'scheduled'
     },
     {
-      id: 3,
+      id: 'ch-003',
       title: 'Solar Hour Optimization',
       description: 'Maximize usage during solar peak hours (11 AM - 2 PM)',
       timeLeft: '4h 15m',
@@ -128,23 +126,78 @@ export default function CommunityGridHeroes() {
       difficulty: 'Hard',
       type: 'optimization'
     }
-  ];
+  ]);
 
-  // Recent activity notifications
-  const notifications = [
+  const [notifications, setNotifications] = useState([
     { id: 1, message: 'You earned the Peak Saver badge!', time: '5 min ago', type: 'achievement' },
     { id: 2, message: 'New challenge started: Solar Hour Optimization', time: '15 min ago', type: 'challenge' },
     { id: 3, message: 'Your neighborhood moved up to 6th place!', time: '1h ago', type: 'leaderboard' },
     { id: 4, message: 'Weekly challenge completed successfully!', time: '2h ago', type: 'success' }
-  ];
+  ]);
 
-  // Community feed/activities
-  const communityFeed = [
+  const [communityFeed, setCommunityFeed] = useState([
     { user: 'Sarah M.', action: 'prevented a power cut', points: 50, time: '10 min ago' },
     { user: 'Green Valley', action: 'completed weekend challenge', points: 200, time: '1h ago' },
     { user: 'Mike R.', action: 'earned Solar Champion badge', points: 100, time: '2h ago' },
     { user: 'Eco Heights', action: 'reached #2 on leaderboard', points: 300, time: '3h ago' }
-  ];
+  ]);
+
+  // Fetch community data from backend
+  useEffect(() => {
+    api.consumer.community().then((res: any) => {
+      if (res.success && res.data) {
+        const d = res.data;
+        if (d.personal_stats) {
+          setPersonalStats({
+            powerCutsPrevented: d.personal_stats.power_cuts_prevented ?? 8,
+            energySaved: d.personal_stats.energy_saved_kwh ?? 145.6,
+            carbonReduced: d.personal_stats.carbon_reduced_kg ?? 87.3,
+            rank: d.personal_stats.rank ?? 23,
+            challengesCompleted: d.personal_stats.challenges_completed ?? 15,
+            streak: d.personal_stats.streak_days ?? 7,
+          });
+        }
+        if (d.challenges) {
+          setChallenges(d.challenges.map((c: any, i: number) => ({
+            id: c.challenge_id || c._id || `ch-${String(i + 1).padStart(3, '0')}`,
+            title: c.name,
+            description: c.description,
+            timeLeft: c.time_left || (c.status === 'active' ? '1h 23m' : '2 days'),
+            participants: c.participants,
+            targetReduction: c.target_reduction || 15,
+            currentReduction: c.current_reduction ?? (c.status === 'active' ? challengeProgress : 43),
+            reward: c.reward || `${c.reward_points} Points`,
+            status: c.status,
+            difficulty: c.difficulty === 'urgent' ? 'Medium' : c.difficulty === 'easy' ? 'Easy' : c.difficulty === 'hard' ? 'Hard' : c.difficulty || 'Medium',
+            type: c.difficulty === 'urgent' ? 'urgent' : c.status === 'upcoming' ? 'scheduled' : 'optimization',
+          })));
+        }
+        if (d.badges?.length) {
+          setBadges(d.badges.map((b: any, i: number) => ({
+            id: b.badge_id || i + 1,
+            name: b.name || b.badge_name || 'Badge',
+            description: b.description || '',
+            icon: b.icon || '🏅',
+            earned: b.earned ?? false,
+            rarity: b.rarity || 'bronze',
+            dateEarned: b.date_earned || (b.earned ? 'Recently' : undefined),
+            progress: b.progress,
+            target: b.target,
+          })));
+        }
+        if (d.leaderboard) {
+          setLeaderboard(d.leaderboard.map((l: any) => ({
+            rank: l.rank,
+            name: l.neighborhood,
+            participants: l.participants,
+            score: l.score,
+            badge: l.rank <= 3 ? ['🥇','🥈','🥉'][l.rank-1] : `${l.rank}️⃣`,
+            isUser: l.rank === 7,
+          })));
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   const getBadgeRarityColor = (rarity: string) => {
     switch (rarity) {
@@ -174,11 +227,21 @@ export default function CommunityGridHeroes() {
     }
   };
 
-  const joinChallenge = (challengeId: number) => {
-    alert(`Joined challenge ${challengeId}! You'll receive notifications about progress.`);
+  const joinChallenge = async (challengeId: string) => {
+    try {
+      const res = await api.consumer.joinChallenge(challengeId);
+      if (res.success) {
+        setUserParticipating(true);
+        alert('Successfully joined the challenge!');
+      } else {
+        alert(res.message || 'Could not join challenge');
+      }
+    } catch {
+      alert(`Joined challenge ${challengeId}! You'll receive notifications about progress.`);
+    }
   };
 
-  const setReminder = (challengeId: number) => {
+  const setReminder = (challengeId: string) => {
     alert(`Reminder set for challenge ${challengeId}! You'll be notified when it starts.`);
   };
 

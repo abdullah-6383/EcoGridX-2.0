@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import AIOptimizer from '@/components/demo/AIOptimizer';
 import StorageManagement from '@/components/demo/StorageManagement';
 import PredictionHistory from '@/components/demo/PredictionHistory';
+import { api } from '@/lib/api';
 
 export default function Demo() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -225,6 +226,34 @@ function Dashboard() {
   const [touchData, setTouchData] = useState({ startX: 0, startY: 0, lastDistance: 0, initialScale: 1 })
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [isZooming, setIsZooming] = useState(false)
+  const [gridStats, setGridStats] = useState({
+    totalProduction: '2,847 MW',
+    currentDemand: '2,650 MW',
+    batteryStorage: '67%',
+    gridLosses: '197 MW',
+    productionChange: '+2.3% from yesterday',
+    peakDemand: 'Peak: 3,100 MW',
+    storageCapacity: '1,340 MWh capacity',
+    lossPercent: '6.9% transmission loss',
+  })
+
+  useEffect(() => {
+    api.dashboard.gridStatus().then((res: any) => {
+      if (res.success && res.data) {
+        const g = res.data.grid_data ?? res.data;
+        setGridStats({
+          totalProduction: `${g.total_production_mw?.toLocaleString() ?? '2,847'} MW`,
+          currentDemand: `${g.current_demand_mw?.toLocaleString() ?? '2,650'} MW`,
+          batteryStorage: `${g.battery_storage_percent ?? 67}%`,
+          gridLosses: `${g.grid_losses_mw ?? 197} MW`,
+          productionChange: g.production_change ?? '+2.3% from yesterday',
+          peakDemand: `Peak: ${g.peak_demand_mw?.toLocaleString() ?? '3,100'} MW`,
+          storageCapacity: `${g.storage_capacity_mwh?.toLocaleString() ?? '1,340'} MWh capacity`,
+          lossPercent: `${g.loss_percent ?? 6.9}% transmission loss`,
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   // Reset zoom function with smooth animation
   const resetZoom = () => {
@@ -1866,6 +1895,38 @@ function Dashboard() {
   );
 }
 function Alerts() {
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [summary, setSummary] = useState({ critical: 4, warning: 8, info: 12, resolved: 47 });
+
+  useEffect(() => {
+    api.alerts.getAll().then((res: any) => {
+      if (res.success && res.data) {
+        if (res.data.alerts) setAlerts(res.data.alerts);
+        if (res.data.summary) setSummary(res.data.summary);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleAlertAction = async (alertId: string, action: string) => {
+    try {
+      const res = await api.alerts.action(alertId, action);
+      if (res.success) {
+        setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, status: 'resolved', action_taken: action } : a));
+        setSummary(prev => ({
+          ...prev,
+          resolved: prev.resolved + 1,
+          critical: prev.critical - (alerts.find(a => a.id === alertId)?.type === 'critical' ? 1 : 0),
+          warning: prev.warning - (alerts.find(a => a.id === alertId)?.type === 'warning' ? 1 : 0),
+          info: prev.info - (alerts.find(a => a.id === alertId)?.type === 'info' ? 1 : 0),
+        }));
+      }
+    } catch {}
+  };
+
+  const criticalAlerts = alerts.filter(a => a.type === 'critical' && a.status === 'active');
+  const warningAlerts = alerts.filter(a => a.type === 'warning' && a.status === 'active');
+  const infoAlerts = alerts.filter(a => a.type === 'info' && a.status === 'active');
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
@@ -1887,7 +1948,7 @@ function Alerts() {
               </svg>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-red-400">4</div>
+              <div className="text-2xl font-bold text-red-400">{summary.critical}</div>
               <div className="text-sm text-gray-400">Active</div>
             </div>
           </div>
@@ -1903,7 +1964,7 @@ function Alerts() {
               </svg>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-yellow-400">8</div>
+              <div className="text-2xl font-bold text-yellow-400">{summary.warning}</div>
               <div className="text-sm text-gray-400">Active</div>
             </div>
           </div>
@@ -1919,7 +1980,7 @@ function Alerts() {
               </svg>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-blue-400">12</div>
+              <div className="text-2xl font-bold text-blue-400">{summary.info}</div>
               <div className="text-sm text-gray-400">Active</div>
             </div>
           </div>
@@ -1935,7 +1996,7 @@ function Alerts() {
               </svg>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-green-400">47</div>
+              <div className="text-2xl font-bold text-green-400">{summary.resolved}</div>
               <div className="text-sm text-gray-400">Today</div>
             </div>
           </div>
@@ -1949,266 +2010,87 @@ function Alerts() {
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
           <h3 className="text-lg font-bold mb-6 text-white flex items-center">
             <div className="w-2 h-2 bg-red-400 rounded-full mr-3"></div>
-            Critical Alerts
+            Critical Alerts ({criticalAlerts.length})
           </h3>
           
           <div className="space-y-4">
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-5 h-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 15.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                  <div>
-                    <div className="text-red-400 font-semibold">Power Line Overload</div>
-                    <div className="text-sm text-gray-400">Transmission Line TL-47</div>
+            {criticalAlerts.length === 0 && (
+              <div className="text-center py-8 text-gray-500">No active critical alerts</div>
+            )}
+            {criticalAlerts.map((alert: any) => (
+              <div key={alert.id} className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-5 h-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.314 15.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <div>
+                      <div className="text-red-400 font-semibold">{alert.title}</div>
+                      <div className="text-sm text-gray-400">{alert.zone || 'Grid Zone'}</div>
+                    </div>
                   </div>
+                  <div className="text-xs text-gray-500">{alert.created_at ? new Date(alert.created_at).toLocaleTimeString() : 'Recent'}</div>
                 </div>
-                <div className="text-xs text-gray-500">2 min ago</div>
-              </div>
-              <div className="text-sm text-gray-300 mb-3">
-                Line operating at 105% capacity (2,625 MW / 2,500 MW limit). Immediate load redistribution required.
-              </div>
-              <div className="flex space-x-2">
-                <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors">
-                  Redistribute Load
-                </button>
-                <button className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors">
-                  View Details
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-5 h-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <div>
-                    <div className="text-red-400 font-semibold">Voltage Drop Critical</div>
-                    <div className="text-sm text-gray-400">Substation Alpha-7</div>
-                  </div>
+                <div className="text-sm text-gray-300 mb-3">{alert.description}</div>
+                <div className="flex space-x-2">
+                  {(alert.actions || ['resolve']).map((action: string) => (
+                    <button key={action} onClick={() => handleAlertAction(alert.id, action)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors capitalize">
+                      {action}
+                    </button>
+                  ))}
+                  <button onClick={() => handleAlertAction(alert.id, 'acknowledge')} className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors">
+                    Acknowledge
+                  </button>
                 </div>
-                <div className="text-xs text-gray-500">3 min ago</div>
               </div>
-              <div className="text-sm text-gray-300 mb-3">
-                Voltage dropped to 0.89 p.u. (below 0.95 threshold). Affecting 12,000 customers in residential zones.
-              </div>
-              <div className="flex space-x-2">
-                <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors">
-                  Voltage Regulation
-                </button>
-                <button className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors">
-                  Isolate Section
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-5 h-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <div>
-                    <div className="text-red-400 font-semibold">Equipment Overload</div>
-                    <div className="text-sm text-gray-400">Transformer T-23</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">5 min ago</div>
-              </div>
-              <div className="text-sm text-gray-300 mb-3">
-                Transformer operating at 115% capacity (23 MVA / 20 MVA rated). Temperature rising to 95°C.
-              </div>
-              <div className="flex space-x-2">
-                <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors">
-                  Load Transfer
-                </button>
-                <button className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors">
-                  Emergency Cooling
-                </button>
-              </div>
-            </div>
-
-            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-5 h-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <div>
-                    <div className="text-red-400 font-semibold">Unusual Pattern Detected</div>
-                    <div className="text-sm text-gray-400">Industrial Zone 4</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">7 min ago</div>
-              </div>
-              <div className="text-sm text-gray-300 mb-3">
-                Abnormal load fluctuation detected: ±340 MW swings in 2-minute intervals. Potential equipment malfunction.
-              </div>
-              <div className="flex space-x-2">
-                <button className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors">
-                  Pattern Analysis
-                </button>
-                <button className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-xs rounded transition-colors">
-                  Investigate Source
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-6">
           <h3 className="text-lg font-bold mb-6 text-white flex items-center">
             <div className="w-2 h-2 bg-yellow-400 rounded-full mr-3"></div>
-            Warning Alerts
+            Warnings & Info ({warningAlerts.length + infoAlerts.length})
           </h3>
           
           <div className="space-y-3">
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <div className="text-yellow-400 font-medium">High Demand Forecast</div>
-                    <div className="text-xs text-gray-400">Peak expected at 6 PM</div>
+            {warningAlerts.length === 0 && infoAlerts.length === 0 && (
+              <div className="text-center py-8 text-gray-500">No active warnings</div>
+            )}
+            {warningAlerts.map((alert: any) => (
+              <div key={alert.id} className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <div className="text-yellow-400 font-medium">{alert.title}</div>
+                      <div className="text-xs text-gray-400">{alert.zone || 'Grid Zone'}</div>
+                    </div>
                   </div>
+                  <div className="text-xs text-gray-500">{alert.created_at ? new Date(alert.created_at).toLocaleTimeString() : 'Recent'}</div>
                 </div>
-                <div className="text-xs text-gray-500">15 min ago</div>
+                <div className="text-xs text-gray-300">{alert.description}</div>
               </div>
-              <div className="text-xs text-gray-300">
-                Predicted demand spike: +380 MW above normal capacity
-              </div>
-            </div>
-
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                  <div>
-                    <div className="text-yellow-400 font-medium">Solar Output Declining</div>
-                    <div className="text-xs text-gray-400">Weather impact detected</div>
+            ))}
+            {infoAlerts.map((alert: any) => (
+              <div key={alert.id} className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <svg className="w-4 h-4 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <div className="text-blue-400 font-medium">{alert.title}</div>
+                      <div className="text-xs text-gray-400">{alert.zone || 'Grid Zone'}</div>
+                    </div>
                   </div>
+                  <div className="text-xs text-gray-500">{alert.created_at ? new Date(alert.created_at).toLocaleTimeString() : 'Recent'}</div>
                 </div>
-                <div className="text-xs text-gray-500">22 min ago</div>
+                <div className="text-xs text-gray-300">{alert.description}</div>
               </div>
-              <div className="text-xs text-gray-300">
-                Cloud cover reducing solar generation by 15%
-              </div>
-            </div>
-
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <div>
-                    <div className="text-yellow-400 font-medium">Voltage Fluctuation</div>
-                    <div className="text-xs text-gray-400">Distribution Feeder F-12</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">18 min ago</div>
-              </div>
-              <div className="text-xs text-gray-300">
-                Voltage varying between 0.96-1.04 p.u., monitor for stability
-              </div>
-            </div>
-
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <div>
-                    <div className="text-yellow-400 font-medium">Equipment Heating</div>
-                    <div className="text-xs text-gray-400">Circuit Breaker CB-45</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">25 min ago</div>
-              </div>
-              <div className="text-xs text-gray-300">
-                Operating temperature 78°C, approaching 85°C threshold
-              </div>
-            </div>
-
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <div>
-                    <div className="text-yellow-400 font-medium">Harmonic Distortion</div>
-                    <div className="text-xs text-gray-400">Commercial District 2</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">32 min ago</div>
-              </div>
-              <div className="text-xs text-gray-300">
-                Total Harmonic Distortion at 4.2%, monitor power quality
-              </div>
-            </div>
-
-            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                  <div>
-                    <div className="text-yellow-400 font-medium">AI Model Drift</div>
-                    <div className="text-xs text-gray-400">Prediction accuracy decline</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">35 min ago</div>
-              </div>
-              <div className="text-xs text-gray-300">
-                Model accuracy dropped to 92.1%, retraining recommended
-              </div>
-            </div>
-
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                  </svg>
-                  <div>
-                    <div className="text-blue-400 font-medium">Scheduled Maintenance</div>
-                    <div className="text-xs text-gray-400">Grid Sector 3</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">1 hour ago</div>
-              </div>
-              <div className="text-xs text-gray-300">
-                Maintenance window: Tomorrow 2:00 AM - 4:00 AM
-              </div>
-            </div>
-
-            <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center space-x-3">
-                  <svg className="w-4 h-4 text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <div className="text-green-400 font-medium">System Optimization Complete</div>
-                    <div className="text-xs text-gray-400">Load balancing updated</div>
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500">2 hours ago</div>
-              </div>
-              <div className="text-xs text-gray-300">
-                AI successfully redistributed 240 MW across zones
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
@@ -2341,6 +2223,44 @@ function Alerts() {
 }
 
 function Settings() {
+  const [settings, setSettings] = useState({
+    base_voltage_kv: 400,
+    frequency_hz: 50,
+    load_flow_method: 'Newton-Raphson',
+    voltage_tolerance_min: 0.95,
+    voltage_tolerance_max: 1.05,
+    auto_optimization: true,
+    model_retraining: 'Daily',
+    prediction_horizon: '24 hours',
+    confidence_threshold: 85,
+    dark_mode: true,
+    auto_refresh: true,
+    refresh_rate_seconds: 5,
+    data_retention_days: 30,
+    export_format: 'CSV',
+    session_timeout_minutes: 30,
+  });
+
+  useEffect(() => {
+    api.settings.getGrid().then((res: any) => {
+      if (res.success && res.data) {
+        setSettings(prev => ({ ...prev, ...res.data }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleSaveSettings = async () => {
+    try {
+      await api.settings.updateGrid(settings);
+    } catch {}
+  };
+
+  const handleExportData = async () => {
+    try {
+      await api.export.download(settings.export_format, 'grid_data', settings.data_retention_days);
+    } catch {}
+  };
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="mb-8">
@@ -2368,10 +2288,10 @@ function Settings() {
                   <span className="text-white font-medium">Base Voltage Level</span>
                   <div className="text-sm text-gray-400">System nominal voltage</div>
                 </div>
-                <select className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
-                  <option>400 kV</option>
-                  <option>230 kV</option>
-                  <option>138 kV</option>
+                <select value={`${settings.base_voltage_kv} kV`} onChange={e => setSettings(prev => ({ ...prev, base_voltage_kv: parseInt(e.target.value) }))} className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
+                  <option value="400">400 kV</option>
+                  <option value="230">230 kV</option>
+                  <option value="138">138 kV</option>
                 </select>
               </div>
             </div>
@@ -2382,9 +2302,9 @@ function Settings() {
                   <span className="text-white font-medium">Frequency</span>
                   <div className="text-sm text-gray-400">System frequency</div>
                 </div>
-                <select className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
-                  <option>50 Hz</option>
-                  <option>60 Hz</option>
+                <select value={settings.frequency_hz} onChange={e => setSettings(prev => ({ ...prev, frequency_hz: parseInt(e.target.value) }))} className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
+                  <option value="50">50 Hz</option>
+                  <option value="60">60 Hz</option>
                 </select>
               </div>
             </div>
@@ -2395,7 +2315,7 @@ function Settings() {
                   <span className="text-white font-medium">Load Flow Method</span>
                   <div className="text-sm text-gray-400">Power flow calculation</div>
                 </div>
-                <select className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
+                <select value={settings.load_flow_method} onChange={e => setSettings(prev => ({ ...prev, load_flow_method: e.target.value }))} className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
                   <option>Newton-Raphson</option>
                   <option>Gauss-Seidel</option>
                   <option>Fast Decoupled</option>
@@ -2410,9 +2330,9 @@ function Settings() {
                   <div className="text-sm text-gray-400">Acceptable voltage range</div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="number" defaultValue="0.95" className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm w-16 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
+                  <input type="number" value={settings.voltage_tolerance_min} onChange={e => setSettings(prev => ({ ...prev, voltage_tolerance_min: parseFloat(e.target.value) }))} className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm w-16 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
                   <span className="text-gray-400">-</span>
-                  <input type="number" defaultValue="1.05" className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm w-16 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
+                  <input type="number" value={settings.voltage_tolerance_max} onChange={e => setSettings(prev => ({ ...prev, voltage_tolerance_max: parseFloat(e.target.value) }))} className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm w-16 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
                   <span className="text-gray-400 text-sm">p.u.</span>
                 </div>
               </div>
@@ -2446,7 +2366,7 @@ function Settings() {
                   <span className="text-white font-medium">Model Retraining</span>
                   <div className="text-sm text-gray-400">Automatic model updates</div>
                 </div>
-                <select className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
+                <select value={settings.model_retraining} onChange={e => setSettings(prev => ({ ...prev, model_retraining: e.target.value }))} className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
                   <option>Daily</option>
                   <option>Weekly</option>
                   <option>Manual</option>
@@ -2460,7 +2380,7 @@ function Settings() {
                   <span className="text-white font-medium">Prediction Horizon</span>
                   <div className="text-sm text-gray-400">Forecast time window</div>
                 </div>
-                <select className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
+                <select value={settings.prediction_horizon} onChange={e => setSettings(prev => ({ ...prev, prediction_horizon: e.target.value }))} className="bg-gray-800 border border-gray-600 rounded px-3 py-1 text-white text-sm">
                   <option>15 minutes</option>
                   <option>1 hour</option>
                   <option>4 hours</option>
@@ -2476,8 +2396,8 @@ function Settings() {
                   <div className="text-sm text-gray-400">Minimum prediction confidence</div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input type="range" min="70" max="99" defaultValue="85" className="flex-1" />
-                  <span className="text-emerald-400 font-bold text-sm w-8">85%</span>
+                  <input type="range" min="70" max="99" value={settings.confidence_threshold} onChange={e => setSettings(prev => ({ ...prev, confidence_threshold: parseInt(e.target.value) }))} className="flex-1" />
+                  <span className="text-emerald-400 font-bold text-sm w-8">{settings.confidence_threshold}%</span>
                 </div>
               </div>
             </div>
@@ -2511,9 +2431,9 @@ function Settings() {
             <div className="p-3 bg-white/5 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-300">Refresh Rate</span>
-                <span className="text-sm text-emerald-400 font-bold">5s</span>
+                <span className="text-sm text-emerald-400 font-bold">{settings.refresh_rate_seconds}s</span>
               </div>
-              <input type="range" min="1" max="30" defaultValue="5" className="w-full" />
+              <input type="range" min="1" max="30" value={settings.refresh_rate_seconds} onChange={e => setSettings(prev => ({ ...prev, refresh_rate_seconds: parseInt(e.target.value) }))} className="w-full" />
             </div>
           </div>
         </div>
@@ -2528,26 +2448,26 @@ function Settings() {
             <div className="p-3 bg-white/5 rounded-lg">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-300">Data Retention</span>
-                <span className="text-sm text-cyan-400 font-bold">30 days</span>
+                <span className="text-sm text-cyan-400 font-bold">{settings.data_retention_days} days</span>
               </div>
-              <select className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-xs">
-                <option>7 days</option>
-                <option>30 days</option>
-                <option>90 days</option>
-                <option>1 year</option>
+              <select value={settings.data_retention_days} onChange={e => setSettings(prev => ({ ...prev, data_retention_days: parseInt(e.target.value) }))} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-xs">
+                <option value="7">7 days</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+                <option value="365">1 year</option>
               </select>
             </div>
             
             <div className="p-3 bg-white/5 rounded-lg">
               <span className="text-sm text-gray-300 block mb-2">Export Format</span>
-              <select className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-xs">
+              <select value={settings.export_format} onChange={e => setSettings(prev => ({ ...prev, export_format: e.target.value }))} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-xs">
                 <option>CSV</option>
                 <option>JSON</option>
                 <option>Excel</option>
               </select>
             </div>
             
-            <button className="w-full p-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors text-blue-400 text-sm">
+            <button onClick={handleExportData} className="w-full p-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg transition-colors text-blue-400 text-sm">
               Export Data
             </button>
           </div>
@@ -2569,11 +2489,11 @@ function Settings() {
             
             <div className="p-3 bg-white/5 rounded-lg">
               <span className="text-sm text-gray-300 block mb-2">Session Timeout</span>
-              <select className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-xs">
-                <option>15 minutes</option>
-                <option>30 minutes</option>
-                <option>1 hour</option>
-                <option>4 hours</option>
+              <select value={settings.session_timeout_minutes} onChange={e => setSettings(prev => ({ ...prev, session_timeout_minutes: parseInt(e.target.value) }))} className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-xs">
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="240">4 hours</option>
               </select>
             </div>
             
@@ -2582,6 +2502,13 @@ function Settings() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Save Settings */}
+      <div className="flex justify-end mb-8">
+        <button onClick={handleSaveSettings} className="px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors font-medium">
+          Save Settings
+        </button>
       </div>
 
       {/* System Actions */}
@@ -2638,6 +2565,26 @@ function Settings() {
 }
 
 function User() {
+  const [user, setUser] = useState({ name: 'User', email: 'user@ecogridx.com', phone: '+1 (555) 123-4567', department: 'Grid Operations' });
+
+  useEffect(() => {
+    api.auth.me().then((res: any) => {
+      if (res.success && res.data) {
+        setUser(prev => ({
+          ...prev,
+          name: res.data.name || prev.name,
+          email: res.data.email || prev.email,
+        }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleSaveProfile = async () => {
+    try {
+      await api.auth.updateProfile({ name: user.name, email: user.email, phone: user.phone, department: user.department });
+    } catch {}
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -2653,12 +2600,12 @@ function User() {
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-8 mb-8">
         <div className="flex items-center space-x-6 mb-8">
           <div className="w-24 h-24 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">J</span>
+            <span className="text-2xl font-bold text-white">{user.name?.charAt(0)?.toUpperCase() || 'U'}</span>
           </div>
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white mb-2">Jisnu</h2>
-            <p className="text-gray-400 mb-1">Grid Operations Manager</p>
-            <p className="text-sm text-gray-500">jisnu@ecogridx.com</p>
+            <h2 className="text-2xl font-bold text-white mb-2">{user.name}</h2>
+            <p className="text-gray-400 mb-1">{user.department}</p>
+            <p className="text-sm text-gray-500">{user.email}</p>
             <div className="flex items-center space-x-4 mt-3">
               <span className="inline-flex items-center px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full mr-1"></div>
@@ -2667,8 +2614,8 @@ function User() {
               <span className="text-xs text-gray-500">Last login: 2 hours ago</span>
             </div>
           </div>
-          <button className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-400 transition-colors">
-            Edit Profile
+          <button onClick={handleSaveProfile} className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-blue-400 transition-colors">
+            Save Profile
           </button>
         </div>
 
@@ -2705,7 +2652,7 @@ function User() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-300 mb-2">First Name</label>
-                <input type="text" defaultValue="Jisnu" className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
+                <input type="text" value={user.name} onChange={e => setUser(prev => ({ ...prev, name: e.target.value }))} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
               </div>
               <div>
                 <label className="block text-sm text-gray-300 mb-2">Last Name</label>
@@ -2715,7 +2662,7 @@ function User() {
             
             <div>
               <label className="block text-sm text-gray-300 mb-2">Email</label>
-              <input type="email" defaultValue="jisnu@ecogridx.com" className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
+              <input type="email" value={user.email} onChange={e => setUser(prev => ({ ...prev, email: e.target.value }))} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
             </div>
             
             <div>
@@ -2730,7 +2677,7 @@ function User() {
             
             <div>
               <label className="block text-sm text-gray-300 mb-2">Phone</label>
-              <input type="tel" defaultValue="+1 (555) 123-4567" className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
+              <input type="tel" value={user.phone} onChange={e => setUser(prev => ({ ...prev, phone: e.target.value }))} className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" />
             </div>
           </div>
         </div>

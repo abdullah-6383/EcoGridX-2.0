@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 
 export default function MainDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -11,14 +12,23 @@ export default function MainDashboard() {
   const [showBillDetails, setShowBillDetails] = useState(false);
   const [alertsEnabled, setAlertsEnabled] = useState(false);
   const [showSlabAlert, setShowSlabAlert] = useState(false);
-
-  // Extended mock data for bill details
-  const billHistory = [
+  const [billHistory, setBillHistory] = useState([
     { month: 'Current', amount: 1250.75, units: 155, avg_daily: 5.2 },
     { month: 'Last Month', amount: 1109.50, units: 138, avg_daily: 4.5 },
     { month: '2 Months Ago', amount: 1289.25, units: 162, avg_daily: 5.4 },
     { month: '3 Months Ago', amount: 998.75, units: 122, avg_daily: 4.1 },
-  ];
+  ]);
+  const [savingsComparison, setSavingsComparison] = useState([
+    { period: 'vs Last Month', amount: 141.25, percentage: 12.7, type: 'increase' },
+    { period: 'vs Same Month Last Year', amount: -45.80, percentage: -3.5, type: 'savings' },
+    { period: 'vs Neighborhood Avg', amount: -89.50, percentage: -6.7, type: 'savings' },
+  ]);
+  const [slabs, setSlabs] = useState([
+    { slab: 1, rate: 3.50, limit: 100, color: 'green' },
+    { slab: 2, rate: 5.50, limit: 200, color: 'yellow' },
+    { slab: 3, rate: 7.50, limit: 300, color: 'orange' },
+    { slab: 4, rate: 9.50, limit: Infinity, color: 'red' }
+  ]);
 
   const alertSettings = [
     { type: 'Bill Threshold', value: '₹1500', enabled: alertsEnabled },
@@ -27,30 +37,39 @@ export default function MainDashboard() {
     { type: 'Daily Usage', value: '6+ kWh/day', enabled: false },
   ];
 
-  const savingsComparison = [
-    { period: 'vs Last Month', amount: 141.25, percentage: 12.7, type: 'increase' },
-    { period: 'vs Same Month Last Year', amount: -45.80, percentage: -3.5, type: 'savings' },
-    { period: 'vs Neighborhood Avg', amount: -89.50, percentage: -6.7, type: 'savings' },
-  ];
-
   // Update time every minute
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-      // Simulate minor bill fluctuations
-      setBillAmount(prev => prev + (Math.random() - 0.5) * 2);
     }, 60000);
 
     return () => clearInterval(timer);
   }, []);
 
-  // Tariff slab data
-  const slabs = [
-    { slab: 1, rate: 3.50, limit: 100, color: 'green' },
-    { slab: 2, rate: 5.50, limit: 200, color: 'yellow' },
-    { slab: 3, rate: 7.50, limit: 300, color: 'orange' },
-    { slab: 4, rate: 9.50, limit: Infinity, color: 'red' }
-  ];
+  // Fetch consumer dashboard data from backend
+  useEffect(() => {
+    api.dashboard.consumer().then(res => {
+      if (res.success && res.data) {
+        const c = res.data.consumer;
+        if (c) {
+          setBillAmount(c.bill_amount ?? billAmount);
+          setUnitsUsed(c.units_used ?? unitsUsed);
+          setCurrentSlab(c.current_slab ?? currentSlab);
+          if (c.bill_history?.length) setBillHistory(c.bill_history);
+          if (c.comparison?.length) setSavingsComparison(c.comparison);
+        }
+        if (res.data.tariff_slabs?.length) {
+          const colors = ['green', 'yellow', 'orange', 'red'];
+          setSlabs(res.data.tariff_slabs.map((s: any, i: number) => ({
+            slab: s.slab ?? i + 1,
+            rate: s.rate ?? s.rate_per_unit ?? 0,
+            limit: s.limit ?? s.upper_limit ?? (i === res.data.tariff_slabs.length - 1 ? Infinity : 100 * (i + 1)),
+            color: colors[Math.min(i, colors.length - 1)]
+          })));
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   const getCurrentSlabInfo = () => {
     for (const slab of slabs) {

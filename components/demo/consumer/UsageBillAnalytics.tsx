@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 
 export default function UsageBillAnalytics() {
   const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -10,7 +11,7 @@ export default function UsageBillAnalytics() {
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   // Mock usage data with realistic consumption patterns
-  const dailyUsage = [
+  const [dailyUsage, setDailyUsage] = useState([
     { hour: '00:00', kwh: 0.8, cost: 4.40 },
     { hour: '01:00', kwh: 0.6, cost: 3.30 },
     { hour: '02:00', kwh: 0.5, cost: 2.75 },
@@ -35,9 +36,9 @@ export default function UsageBillAnalytics() {
     { hour: '21:00', kwh: 2.1, cost: 11.55 },
     { hour: '22:00', kwh: 1.8, cost: 9.90 },
     { hour: '23:00', kwh: 1.2, cost: 6.60 }
-  ];
+  ]);
 
-  const weeklyUsage = [
+  const [weeklyUsage, setWeeklyUsage] = useState([
     { day: 'Mon', kwh: 45.2, cost: 248.60 },
     { day: 'Tue', kwh: 42.8, cost: 235.40 },
     { day: 'Wed', kwh: 48.1, cost: 264.55 },
@@ -45,9 +46,9 @@ export default function UsageBillAnalytics() {
     { day: 'Fri', kwh: 46.6, cost: 256.30 },
     { day: 'Sat', kwh: 58.3, cost: 320.65 },
     { day: 'Sun', kwh: 52.9, cost: 290.95 }
-  ];
+  ]);
 
-  const monthlyUsage = [
+  const [monthlyUsage, setMonthlyUsage] = useState([
     { month: 'Apr', kwh: 1156, cost: 6358.00 },
     { month: 'May', kwh: 1289, cost: 7089.50 },
     { month: 'Jun', kwh: 1534, cost: 8437.00 },
@@ -60,16 +61,16 @@ export default function UsageBillAnalytics() {
     { month: 'Jan', kwh: 1234, cost: 6787.00 },
     { month: 'Feb', kwh: 1187, cost: 6528.50 },
     { month: 'Mar', kwh: 1245, cost: 6847.50 }
-  ];
+  ]);
 
-  const comparisonData = {
+  const [comparisonData, setComparisonData] = useState({
     neighbors: { avg: 167, your: 155, difference: -12, percentile: 68 },
     city: { avg: 142, your: 155, difference: 13, percentile: 34 },
     similar_homes: { avg: 159, your: 155, difference: -4, percentile: 55 }
-  };
+  });
 
   // Bill breakdown data
-  const billBreakdown = {
+  const [billBreakdown, setBillBreakdown] = useState({
     totalAmount: 1250.75,
     components: [
       {
@@ -121,7 +122,46 @@ export default function UsageBillAnalytics() {
         color: 'red'
       }
     ]
-  };
+  });
+
+  // Fetch usage analytics from backend
+  useEffect(() => {
+    api.consumer.usageAnalytics().then(res => {
+      if (res.success && res.data) {
+        const d = res.data;
+        if (d.daily_usage?.length) {
+          setDailyUsage(d.daily_usage.map((item: any) => ({
+            hour: `${String(item.hour).padStart(2, '0')}:00`,
+            kwh: item.kwh,
+            cost: item.cost,
+          })));
+        }
+        if (d.weekly_usage?.length) {
+          setWeeklyUsage(d.weekly_usage);
+        }
+        if (d.monthly_usage?.length) {
+          setMonthlyUsage(d.monthly_usage);
+        }
+        if (d.comparison) {
+          setComparisonData(d.comparison);
+        }
+        if (d.bill_breakdown?.length) {
+          const colorMap: Record<number, string> = { 0: 'green', 1: 'yellow', 2: 'blue', 3: 'purple', 4: 'orange', 5: 'red' };
+          setBillBreakdown({
+            totalAmount: d.quick_insights?.total_bill ?? 1250.75,
+            components: d.bill_breakdown.map((item: any, idx: number) => ({
+              category: item.label,
+              units: 0,
+              rate: 0,
+              amount: item.amount,
+              percentage: item.percent,
+              color: colorMap[idx] || 'gray',
+            })),
+          });
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   const getCurrentData = () => {
     switch (viewMode) {

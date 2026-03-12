@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { api } from '@/lib/api';
 
 export default function PowerReliabilityCenter() {
   const [selectedArea, setSelectedArea] = useState<string | null>(null);
@@ -204,7 +205,7 @@ export default function PowerReliabilityCenter() {
   }, []);
 
   // Mock outage data for different areas
-  const outageAreas = [
+  const [outageAreas, setOutageAreas] = useState([
     { id: 'sector-15', name: 'Sector 15', status: 'outage', since: '2:15 PM', affected: 2400 },
     { id: 'downtown', name: 'Downtown', status: 'outage', since: '1:45 PM', affected: 1800 },
     { id: 'tech-district', name: 'Tech District', status: 'normal', since: null, affected: 0 },
@@ -218,10 +219,10 @@ export default function PowerReliabilityCenter() {
     { id: 'airport-zone', name: 'Airport Zone', status: 'outage', since: '4:00 PM', affected: 780 },
     { id: 'university-campus', name: 'University Campus', status: 'normal', since: null, affected: 0 },
     { id: 'harbor-district', name: 'Harbor District', status: 'normal', since: null, affected: 0 }
-  ];
+  ]);
 
   // Extended load shedding schedule with more data
-  const loadSheddingSchedule = [
+  const [loadSheddingSchedule, setLoadSheddingSchedule] = useState([
     {
       date: 'Today',
       area: 'Your Area (Sector 12)',
@@ -267,14 +268,39 @@ export default function PowerReliabilityCenter() {
       impact: 'Medium',
       type: 'planned'
     }
-  ];
+  ]);
 
   // Extended outage data with more details
-  const reliabilityStats = {
+  const [reliabilityStats, setReliabilityStats] = useState({
     today: { uptime: 98.5, outages: 1, avgDuration: '45 min', affected: 2400 },
     week: { uptime: 97.8, outages: 4, avgDuration: '1.2 hrs', affected: 8900 },
     month: { uptime: 96.9, outages: 12, avgDuration: '1.8 hrs', affected: 24500 }
-  };
+  });
+
+  // Fetch reliability data from backend
+  useEffect(() => {
+    api.consumer.reliability().then(res => {
+      if (res.success && res.data) {
+        if (res.data.areas?.length) {
+          setOutageAreas(res.data.areas);
+        }
+        if (res.data.load_shedding?.length) {
+          setLoadSheddingSchedule(res.data.load_shedding.map((ls: any) => ({
+            date: ls.date,
+            area: ls.area,
+            time: ls.time,
+            reason: ls.reason,
+            status: 'scheduled',
+            impact: ls.impact,
+            type: 'planned',
+          })));
+        }
+        if (res.data.stats) {
+          setReliabilityStats(res.data.stats);
+        }
+      }
+    }).catch(() => {});
+  }, []);
 
   const notificationSettings = [
     { type: 'Outage Alerts', enabled: notificationsEnabled, description: 'Get notified of power cuts in your area' },
@@ -345,7 +371,21 @@ export default function PowerReliabilityCenter() {
             <div className="w-3 h-3 bg-purple-400 rounded-full mr-3"></div>
             Reliability Statistics
           </h3>
-          <div className="text-sm text-gray-400">Current {selectedTimeframe}</div>
+          <div className="flex items-center space-x-2">
+            {(['today', 'week', 'month'] as const).map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setSelectedTimeframe(tf)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  selectedTimeframe === tf
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
+                }`}
+              >
+                {tf === 'today' ? 'Today' : tf === 'week' ? 'Week' : 'Month'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -537,7 +577,21 @@ export default function PowerReliabilityCenter() {
             <div className="w-3 h-3 bg-purple-400 rounded-full mr-3"></div>
             Reliability Statistics
           </h3>
-          <div className="text-sm text-gray-400">Current {selectedTimeframe}</div>
+          <div className="flex items-center space-x-2">
+            {(['today', 'week', 'month'] as const).map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setSelectedTimeframe(tf)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  selectedTimeframe === tf
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-700 text-gray-400 hover:text-white hover:bg-gray-600'
+                }`}
+              >
+                {tf === 'today' ? 'Today' : tf === 'week' ? 'Week' : 'Month'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

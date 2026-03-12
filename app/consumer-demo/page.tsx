@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import MainDashboard from '@/components/demo/consumer/MainDashboard';
 import PowerReliabilityCenter from '@/components/demo/consumer/PowerReliabilityCenter';
 import UsageBillAnalytics from '@/components/demo/consumer/UsageBillAnalytics';
 import CommunityGridHeroes from '@/components/demo/consumer/CommunityGridHeroes';
+import { api } from '@/lib/api';
 
 export default function ConsumerDemo() {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -306,6 +307,34 @@ function XIcon() {
 
 // Placeholder components for Settings and Account
 function ConsumerSettings() {
+  const [settings, setSettings] = useState({
+    bill_alerts: true,
+    outage_notifications: true,
+    energy_saving_tips: false,
+    theme: 'Dark Theme',
+    language: 'English',
+  });
+
+  useEffect(() => {
+    api.settings.getConsumer().then((res: any) => {
+      if (res.success && res.data) {
+        setSettings(prev => ({ ...prev, ...res.data }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const toggleSetting = async (key: string) => {
+    const updated = { ...settings, [key]: !(settings as any)[key] };
+    setSettings(updated);
+    try { await api.settings.updateConsumer(updated); } catch {}
+  };
+
+  const updateSetting = async (key: string, value: string) => {
+    const updated = { ...settings, [key]: value };
+    setSettings(updated);
+    try { await api.settings.updateConsumer(updated); } catch {}
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -323,20 +352,20 @@ function ConsumerSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Bill alerts</span>
-              <div className="w-10 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
-                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+              <div onClick={() => toggleSetting('bill_alerts')} className={`w-10 h-6 ${settings.bill_alerts ? 'bg-emerald-500' : 'bg-gray-600'} rounded-full relative cursor-pointer`}>
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full ${settings.bill_alerts ? 'right-1' : 'left-1'}`}></div>
               </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Outage notifications</span>
-              <div className="w-10 h-6 bg-emerald-500 rounded-full relative cursor-pointer">
-                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+              <div onClick={() => toggleSetting('outage_notifications')} className={`w-10 h-6 ${settings.outage_notifications ? 'bg-emerald-500' : 'bg-gray-600'} rounded-full relative cursor-pointer`}>
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full ${settings.outage_notifications ? 'right-1' : 'left-1'}`}></div>
               </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-gray-300">Energy saving tips</span>
-              <div className="w-10 h-6 bg-gray-600 rounded-full relative cursor-pointer">
-                <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+              <div onClick={() => toggleSetting('energy_saving_tips')} className={`w-10 h-6 ${settings.energy_saving_tips ? 'bg-emerald-500' : 'bg-gray-600'} rounded-full relative cursor-pointer`}>
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full ${settings.energy_saving_tips ? 'right-1' : 'left-1'}`}></div>
               </div>
             </div>
           </div>
@@ -347,7 +376,7 @@ function ConsumerSettings() {
           <div className="space-y-3">
             <div>
               <label className="block text-gray-300 mb-2">Theme</label>
-              <select className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white">
+              <select value={settings.theme} onChange={e => updateSetting('theme', e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white">
                 <option>Dark Theme</option>
                 <option>Light Theme</option>
                 <option>Auto</option>
@@ -355,7 +384,7 @@ function ConsumerSettings() {
             </div>
             <div>
               <label className="block text-gray-300 mb-2">Language</label>
-              <select className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white">
+              <select value={settings.language} onChange={e => updateSetting('language', e.target.value)} className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white">
                 <option>English</option>
                 <option>Spanish</option>
                 <option>French</option>
@@ -369,6 +398,24 @@ function ConsumerSettings() {
 }
 
 function ConsumerAccount() {
+  const [profile, setProfile] = useState({ name: 'User', email: 'user@email.com', phone: '+1 (555) 123-4567', address: '123 Main St, Anytown, ST 12345' });
+
+  useEffect(() => {
+    api.auth.me().then((res: any) => {
+      if (res.success && res.data) {
+        setProfile(prev => ({
+          ...prev,
+          name: res.data.name || prev.name,
+          email: res.data.email || prev.email,
+        }));
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleSave = async () => {
+    try { await api.auth.updateProfile(profile); } catch {}
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
@@ -389,7 +436,8 @@ function ConsumerAccount() {
               <input 
                 type="text" 
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" 
-                defaultValue="John Smith"
+                value={profile.name}
+                onChange={e => setProfile(prev => ({ ...prev, name: e.target.value }))}
               />
             </div>
             <div>
@@ -397,7 +445,8 @@ function ConsumerAccount() {
               <input 
                 type="email" 
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" 
-                defaultValue="john.smith@email.com"
+                value={profile.email}
+                onChange={e => setProfile(prev => ({ ...prev, email: e.target.value }))}
               />
             </div>
             <div>
@@ -405,9 +454,13 @@ function ConsumerAccount() {
               <input 
                 type="tel" 
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" 
-                defaultValue="+1 (555) 123-4567"
+                value={profile.phone}
+                onChange={e => setProfile(prev => ({ ...prev, phone: e.target.value }))}
               />
             </div>
+            <button onClick={handleSave} className="w-full p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-white font-medium transition-colors">
+              Save Changes
+            </button>
           </div>
         </div>
 
@@ -428,7 +481,8 @@ function ConsumerAccount() {
               <input 
                 type="text" 
                 className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white" 
-                defaultValue="123 Main St, Anytown, ST 12345"
+                value={profile.address}
+                onChange={e => setProfile(prev => ({ ...prev, address: e.target.value }))}
               />
             </div>
             <div>

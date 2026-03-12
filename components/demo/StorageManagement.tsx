@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
 
 export default function StorageManagement() {
   const [selectedStorage, setSelectedStorage] = useState<string | null>(null);
 
-  const storageUnits = [
+  const defaultStorageUnits = [
     {
       id: 'BESS-001',
       name: 'Central Battery Bank',
@@ -93,6 +94,56 @@ export default function StorageManagement() {
     },
   ];
 
+  const [storageUnits, setStorageUnits] = useState(defaultStorageUnits);
+  const [overview, setOverview] = useState({
+    total_capacity_kwh: 3250,
+    current_energy_kwh: 2100,
+    utilization_percent: 65,
+    total_units: 8,
+    active_units: 6,
+    standby_units: 2,
+  });
+
+  useEffect(() => {
+    api.storage.getAll().then(res => {
+      if (res.success && res.data) {
+        if (res.data.units?.length) {
+          setStorageUnits(res.data.units.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            capacity: `${u.capacity_kwh} kWh`,
+            currentLevel: u.current_level_percent,
+            chargeRate: `+${u.charge_rate_kw} kW`,
+            dischargeRate: `-${u.discharge_rate_kw} kW`,
+            currentMode: u.current_mode,
+            health: u.health,
+            efficiency: u.efficiency,
+            location: u.location,
+            status: u.status === 'active' ? 'Active' : u.status === 'maintenance' ? 'Maintenance' : u.status,
+            type: u.type,
+            temperature: `${u.temperature}°C`,
+            cycles: u.cycles,
+            lastMaintenance: u.last_maintenance,
+          })));
+        }
+        if (res.data.overview) {
+          setOverview(res.data.overview);
+        }
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleCommand = async (unitId: string, command: string) => {
+    try {
+      const res = await api.storage.command(unitId, command);
+      if (res.success) {
+        setStorageUnits(prev => prev.map(u =>
+          u.id === unitId ? { ...u, currentMode: res.data.new_mode } : u
+        ));
+      }
+    } catch {}
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Active':
@@ -144,18 +195,18 @@ export default function StorageManagement() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-400 mb-2">Total Storage Capacity</h3>
-          <p className="text-2xl font-bold text-white">3.25 MWh</p>
+          <p className="text-2xl font-bold text-white">{(overview.total_capacity_kwh / 1000).toFixed(2)} MWh</p>
           <p className="text-xs text-gray-500 mt-1">Maximum grid storage</p>
         </div>
         <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-400 mb-2">Current Stored Energy</h3>
-          <p className="text-2xl font-bold text-green-400">2.1 MWh</p>
-          <p className="text-xs text-gray-500 mt-1">65% capacity utilized</p>
+          <p className="text-2xl font-bold text-green-400">{(overview.current_energy_kwh / 1000).toFixed(1)} MWh</p>
+          <p className="text-xs text-gray-500 mt-1">{overview.utilization_percent}% capacity utilized</p>
         </div>
         <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-400 mb-2">Number of Storage Units</h3>
-          <p className="text-2xl font-bold text-blue-400">8 Units</p>
-          <p className="text-xs text-gray-500 mt-1">6 active, 2 standby</p>
+          <p className="text-2xl font-bold text-blue-400">{overview.total_units} Units</p>
+          <p className="text-xs text-gray-500 mt-1">{overview.active_units} active, {overview.standby_units} standby</p>
         </div>
         <div className="bg-gray-800 rounded-lg p-6">
           <h3 className="text-sm font-medium text-gray-400 mb-2">Charge/Discharge Status</h3>
@@ -232,11 +283,17 @@ export default function StorageManagement() {
                 </div>
 
                 <div className="ml-6 flex flex-col gap-2">
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                    View Details
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedStorage(selectedStorage === unit.id ? null : unit.id); }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                  >
+                    {selectedStorage === unit.id ? 'Hide Details' : 'View Details'}
                   </button>
-                  <button className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm transition-colors">
-                    Configure
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCommand(unit.id, unit.currentMode === 'Charging' ? 'Standby' : 'Charging'); }}
+                    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-sm transition-colors"
+                  >
+                    Toggle Mode
                   </button>
                 </div>
               </div>
@@ -356,6 +413,26 @@ export default function StorageManagement() {
                           <span className="text-sm text-gray-300">Last Maintenance</span>
                           <span className="text-sm text-white">{unit.lastMaintenance}</span>
                         </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-900 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-400 mb-3">Mode Control</h4>
+                      <div className="space-y-2">
+                        {['Charging', 'Discharging', 'Standby'].map((mode) => (
+                          <button
+                            key={mode}
+                            onClick={() => handleCommand(unit.id, mode)}
+                            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                              unit.currentMode === mode
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                            }`}
+                          >
+                            {mode === 'Charging' ? '⚡' : mode === 'Discharging' ? '🔋' : '⏸️'} {mode}
+                            {unit.currentMode === mode && ' (Active)'}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
