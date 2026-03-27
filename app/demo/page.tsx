@@ -12,6 +12,14 @@ export default function Demo() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Auto-login for demo: silently authenticate if no token exists
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      api.auth.login('admin@ecogridx.com', 'admin123').catch(() => {});
+    }
+  }, []);
+
   return (
     <main className="relative min-h-screen bg-gray-950 text-white">
       <BackgroundEffects />

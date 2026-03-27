@@ -12,6 +12,14 @@ export default function ConsumerDemo() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Auto-login for demo
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      api.auth.login('consumer@ecogridx.com', 'admin123').catch(() => {});
+    }
+  }, []);
+
   const sections = [
     { 
       id: 'dashboard', 
